@@ -125,7 +125,7 @@ function addToCart(itemId, itemName, quantity, totalPrice) {
         id: itemId,
         name: itemName,
         quantity: quantity,
-        totalPrice: totalPrice
+        totalPrice: totalPrice * quantity
     })
 }
 
@@ -154,8 +154,9 @@ function viewCart() {
     });
 
     cart.forEach(function (element) {
-        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + element.totalPrice])
-        cartTotal += element.totalPrice;
+        let combinedPrice = element.totalPrice * element.quantity
+        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + combinedPrice])
+        cartTotal += combinedPrice;
     })
     cartTable.push(['', 'CART TOTAL:', '$' + cartTotal])
     console.log(cartTable.toString() + '\n')
@@ -167,43 +168,94 @@ function viewCart() {
         choices: ['Checkout', 'Continue shopping', 'Update Cart']
     }]).then(function (response) {
 
-        switch(response.continue) {
-            case 'Checkout' : 
+        switch (response.continue) {
+            case 'Checkout':
                 console.log('Thanks for shopping with Bamazon! Your fake purchase will be fake delivered to you soon!')
                 connection.end();
                 break;
-            case 'Continue shopping' : 
+            case 'Continue shopping':
                 navItems();
                 break;
-            case 'Update Cart' : 
+            case 'Update Cart':
                 updateCart();
                 break;
         }
     })
 }
 
-function updateCart(){
+function updateCart() {
+    let currentStock;
+    let editItem;
     inquirer.prompt([{
         type: 'list',
         name: 'cart_list',
         message: 'Please choose and item you would like to edit.',
         choices: cart
     }]).then(function (response) {
-        let editItem = response.cart_list;
-        connection.query(`SELECT * FROM products WHERE product_name = '${editItem}'`, function(err, res){
+        editItem = response.cart_list;
+        connection.query(`SELECT * FROM products WHERE product_name = '${editItem}'`, function (err, res) {
             if (err) throw err;
-            let currentStock = res[0].stock_quantity;
-            console.log('current quantity in db: ',currentStock);
+            currentStock = res[0].stock_quantity;
         })
-        // inquirer.prompt([{
-        //     type:'list',    
-        //     name:'add_delete',
-        //     message: 'Would you like to add or remove quantity of this item?',
-        //     choices: ['add','remove']
-        // }]).then(function(result){
-        //     if (result.add_delete === 'add'){
-        //         connection.query(`UPDATE products`)
-        //     }
-        // })
+        inquirer.prompt([{
+            type: 'list',
+            name: 'add_delete',
+            message: 'Would you like to add or remove quantity of this item?',
+            choices: ['add', 'remove']
+        }]).then(function (result) {
+            result.add_delete === 'add' ? alterQuantity('add', currentStock, editItem) : alterQuantity('subtract', currentStock, editItem);
+        })
     });
+}
+
+function alterQuantity(operation, currentStock, item) {
+    let newStock;
+    let itemIndex;
+    let cartQuant;
+    inquirer.prompt([{
+        type: 'input',
+        name: 'alter_quant',
+        message: () => {
+            if (operation === 'add') {
+                return 'How many would you like to add to your cart?'
+            } else {
+                return 'How many would you like to remove from your cart?'
+            }
+        }
+    }]).then(function (result) {
+        if (operation === 'add') {
+            newStock = parseInt(currentStock) - parseInt(result.alter_quant);
+            connection.query(`
+            UPDATE products
+            SET stock_quantity = ${newStock}
+            WHERE product_name = '${item}'
+            `);
+
+            //modify cart array
+            itemIndex = cart.findIndex(function(element){
+                return element.name === item
+            });
+            cartQuant = parseInt(cart[itemIndex].quantity) + parseInt(result.alter_quant);
+            cart[itemIndex].quantity = cartQuant;
+
+            viewCart();
+
+        } else {
+            newStock = parseInt(currentStock) + parseInt(result.alter_quant);
+            connection.query(`
+            UPDATE products
+            SET stock_quantity = ${newStock}
+            WHERE product_name = '${item}'
+            `);
+
+             //modify cart array
+             itemIndex = cart.findIndex(function(element){
+                return element.name === item
+            });
+            cartQuant = parseInt(cart[itemIndex].quantity) - parseInt(result.alter_quant);
+            cart[itemIndex].quantity = cartQuant;
+
+             viewCart();
+        }
+    })
 }
