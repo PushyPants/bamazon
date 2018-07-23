@@ -2,7 +2,9 @@ let mysql = require('mysql');
 let inquirer = require('inquirer');
 let Table = require('cli-table');
 let fs = require('fs');
+//let tableChars = require('./table.js')
 
+let cart = [];
 
 
 let connection = mysql.createConnection({
@@ -16,6 +18,8 @@ let connection = mysql.createConnection({
 connection.connect(function (err) {
     if (err) throw err;
 });
+
+displayLogo();
 
 function displayLogo() { // grab ascii text from logo.txt file and print it in console
     fs.readFile('logo.txt', 'utf8', function (err, data) {
@@ -41,42 +45,165 @@ function navItems() {
                 choices: itemArr
             }]).then(function (response) {
                 let itemId = response.item_list.split('.', 1).join('');
+                let itemName = res[itemId - 1].product_name;
                 let itemPrice = res[itemId - 1].price;
-                let currentStock = res[itemId - 1].stock_quantity
-                console.log(`Current Stock: ${currentStock}`)
+                let currentStock = res[itemId - 1].stock_quantity;
 
-                inquirer.prompt([{
-                    type: 'input',
-                    name: 'purchase_quantity',
-                    message: 'How many would you like to purchase?',
-                    validate: function (value) {
-                        if (isNaN(value) === false) {
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    }
-                }]).then(function (result) {
-                    updateStock(itemId, currentStock, itemPrice, result.purchase_quantity)
-                })
+                if (currentStock <= 0) {
+                    console.log(`\nCurrently out of stock. Please select a different item.\n`)
+                    setTimeout(() => { navItems() }, 2000);
+
+                } else {
+                    quantityPrompt(itemId, itemName, currentStock, itemPrice);
+                }
             })
         });
 }
 
 navItems();
 
-function updateStock(itemId, stock, price, quantity) {
-    console.log(`Item Id: ${itemId} current stock: ${stock} price: $${price}`)
-    let newStock = stock - quantity;
-    console.log(newStock)
-    connection.query(`
-    UPDATE products
-    SET stock_quantity = ${newStock}
-    WHERE item_id = ${itemId}
-    `);
-
-    connection.query(`SELECT * FROM products WHERE item_id = ${itemId}`, function (err, res) {
-        console.log('new stock amt:', res[0].stock_quantity)
-
+function quantityPrompt(itemId, itemName, currentStock, itemPrice) {
+    inquirer.prompt([{
+        type: 'input',
+        name: 'purchase_quantity',
+        message: 'How many would you like to purchase?',
+        validate: function (value) {
+            if (isNaN(value) === false && value > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }]).then(function (result) {
+        if (result.purchase_quantity > currentStock) {
+            console.log(`\n There is not enough in stock to fulfill your order.\n Please choose a different amount.\n`);
+            quantityPrompt(itemId, itemName, currentStock, itemPrice);
+        } else {
+            updateStock(itemId, itemName, currentStock, itemPrice, result.purchase_quantity)
+        };
     })
+}
+
+function updateStock(itemId, itemName, stock, price, quantity) {
+    let newStock = stock - quantity;
+    let itemCost = price * quantity;
+    console.log('\n\nTotal cost is: $', itemCost)
+
+    inquirer.prompt([{
+        type: 'confirm',
+        name: 'add_cart',
+        message: 'Would you like to add this to your cart?'
+    }]).then(function (result) {
+        if (result.add_cart) {
+            connection.query(`
+            UPDATE products
+            SET stock_quantity = ${newStock}
+            WHERE item_id = ${itemId}
+            `);
+
+            addToCart(itemId, itemName, quantity, itemCost);
+
+            inquirer.prompt([{
+                type: 'confirm',
+                name: 'view_cart',
+                message: 'would you like to view your cart?'
+            }]).then(function (result) {
+                if (result.view_cart) {
+                    viewCart();
+                } else {
+                    navItems();
+                }
+            })
+        } else {
+            navItems();
+        }
+    })
+}
+
+function addToCart(itemId, itemName, quantity, totalPrice) {
+    cart.push({
+        id: itemId,
+        name: itemName,
+        quantity: quantity,
+        totalPrice: totalPrice
+    })
+}
+
+function viewCart() {
+    let cartTotal = 0;
+
+    let cartTable = new Table({
+        head: ['Item', 'Quantity in Cart', 'Total Price'],
+        chars: {
+            'top': '═',
+            'top-mid': '╤',
+            'top-left': '╔',
+            'top-right': '╗',
+            'bottom': '═',
+            'bottom-mid': '╧',
+            'bottom-left': '╚',
+            'bottom-right': '╝',
+            'left': '║',
+            'left-mid': '╟',
+            'mid': '─',
+            'mid-mid': '┼',
+            'right': '║',
+            'right-mid': '╢',
+            'middle': '│'
+        }
+    });
+
+    cart.forEach(function (element) {
+        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + element.totalPrice])
+        cartTotal += element.totalPrice;
+    })
+    cartTable.push(['', 'CART TOTAL:', '$' + cartTotal])
+    console.log(cartTable.toString() + '\n')
+
+    inquirer.prompt([{
+        type: 'list',
+        name: 'continue',
+        message: 'Would you like to continue checkout or continue shopping?',
+        choices: ['Checkout', 'Continue shopping', 'Update Cart']
+    }]).then(function (response) {
+
+        switch(response.continue) {
+            case 'Checkout' : 
+                console.log('Thanks for shopping with Bamazon! Your fake purchase will be fake delivered to you soon!')
+                connection.end();
+                break;
+            case 'Continue shopping' : 
+                navItems();
+                break;
+            case 'Update Cart' : 
+                updateCart();
+                break;
+        }
+    })
+}
+
+function updateCart(){
+    inquirer.prompt([{
+        type: 'list',
+        name: 'cart_list',
+        message: 'Please choose and item you would like to edit.',
+        choices: cart
+    }]).then(function (response) {
+        let editItem = response.cart_list;
+        connection.query(`SELECT * FROM products WHERE product_name = '${editItem}'`, function(err, res){
+            if (err) throw err;
+            let currentStock = res[0].stock_quantity;
+            console.log('current quantity in db: ',currentStock);
+        })
+        // inquirer.prompt([{
+        //     type:'list',    
+        //     name:'add_delete',
+        //     message: 'Would you like to add or remove quantity of this item?',
+        //     choices: ['add','remove']
+        // }]).then(function(result){
+        //     if (result.add_delete === 'add'){
+        //         connection.query(`UPDATE products`)
+        //     }
+        // })
+    });
 }
