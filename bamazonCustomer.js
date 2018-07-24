@@ -50,10 +50,12 @@ function navItems() {
             let currentStock = res[itemId - 1].stock_quantity;
 
             if (currentStock <= 0) {
-                console.log(`\nCurrently out of stock. Please select a different item.\n`)
+                console.log(`\n*************************************************************`)
+                console.log(`** Currently out of stock. Please select a different item. **`)
+                console.log(`*************************************************************\n`)
                 setTimeout(() => {
                     navItems()
-                }, 2000);
+                }, 1000);
 
             } else {
                 quantityPrompt(itemId, itemName, currentStock, itemPrice);
@@ -78,8 +80,15 @@ function quantityPrompt(itemId, itemName, currentStock, itemPrice) {
         }
     }]).then(function (result) {
         if (result.purchase_quantity > currentStock) {
-            console.log(`\n There is not enough in stock to fulfill your order.\n Please choose a different amount.\n`);
-            quantityPrompt(itemId, itemName, currentStock, itemPrice);
+
+            console.log(`\n*********************************************************`)
+            console.log(`** There is not enough in stock to fulfill your order. **`)
+            console.log(`**          Please choose a different amount           **`)
+            console.log(`*********************************************************\n`)
+            setTimeout(() => {
+                quantityPrompt(itemId, itemName, currentStock, itemPrice);
+            }, 1000);
+
         } else {
             updateStock(itemId, itemName, currentStock, itemPrice, result.purchase_quantity)
         };
@@ -124,22 +133,22 @@ function updateStock(itemId, itemName, stock, price, quantity) {
 
 function addToCart(itemId, itemName, quantity, totalPrice) {
 
-    
-        let itemIndex = cart.findIndex(function (element) {
-            return element.name === itemName;
-        });
 
-        if (itemIndex === -1) {
-            cart.push({
-                id: itemId,
-                name: itemName,
-                quantity: quantity,
-                totalPrice: totalPrice
-            })
-        } else {
+    let itemIndex = cart.findIndex(function (element) {
+        return element.name === itemName;
+    });
+
+    if (itemIndex === -1) {
+        cart.push({
+            id: itemId,
+            name: itemName,
+            quantity: quantity,
+            totalPrice: totalPrice
+        })
+    } else {
         cartQuant = parseInt(cart[itemIndex].quantity) + parseInt(quantity);
         cart[itemIndex].quantity = cartQuant;
-        }    
+    }
 }
 
 function viewCart() {
@@ -147,6 +156,7 @@ function viewCart() {
     let combinedPrice;
 
     let cartTable = new Table({
+        head: ['SHOPPING CART'],
         head: ['Item', 'Quantity in Cart', 'Total Price'],
         chars: {
             'top': '═',
@@ -169,14 +179,19 @@ function viewCart() {
 
     cart.forEach(function (element, index) {
         if (element.quantity === 0) {
-            cart.splice(index,1)
-        
-    } else {
-        cartTotal += element.totalPrice * element.quantity;
-        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + (element.totalPrice * element.quantity)])
-    }
-})
+            cart.splice(index, 1)
+        };
+    });
+    //I had these in the same forEach but it might have been moving too fast because the table would show up empty. I moved it out into multiple statements to fix it.
+    cart.forEach(function (element, index) {
+            cartTotal += element.totalPrice * element.quantity;
+            cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + (element.totalPrice * element.quantity)])
+    })
+
     cartTable.push(['', 'CART TOTAL:', '$' + cartTotal])
+    // console.log(`\n   ===================================================`)
+    // console.log(`   ================   SHOPPING CART   ================`)
+    console.log(`\n\nSHOPPING CART`)
     console.log(cartTable.toString() + '\n')
 
     inquirer.prompt([{
@@ -188,7 +203,10 @@ function viewCart() {
 
         switch (response.continue) {
             case 'Checkout':
-                console.log('Thanks for shopping with Bamazon! Your fake purchase will be fake delivered to you soon!')
+                console.log(`\n**********************************************************************************************`)
+                console.log(`** Thanks for shopping with Bamazon! Your fake purchase will be fake delivered to you soon! **`)
+                console.log(`**********************************************************************************************\n`)
+
                 connection.end();
                 break;
             case 'Continue shopping':
@@ -253,19 +271,25 @@ function alterQuantity(operation, currentStock, item) {
             itemIndex = cart.findIndex(function (element) {
                 return element.name === item
             });
-            console.log(itemIndex)
             cartQuant = parseInt(cart[itemIndex].quantity) + parseInt(result.alter_quant);
             cart[itemIndex].quantity = cartQuant;
 
-            viewCart();
+            setTimeout(() => {
+                viewCart()
+            }, 1000);
 
         } else {
             itemIndex = cart.findIndex(function (element) {
                 return element.name === item
             });
             if (cart[itemIndex].quantity < result.alter_quant) {
-                console.log(`Can't remove more than you have! Try again!`)
-                viewCart();
+
+                console.log(`\n*************************************************`)
+                console.log(`** Can't remove more than you have! Try again! **`)
+                console.log(`*************************************************\n`)
+                setTimeout(() => {
+                    viewCart()
+                }, 1000);
 
             } else {
 
@@ -280,7 +304,9 @@ function alterQuantity(operation, currentStock, item) {
                 cartQuant = parseInt(cart[itemIndex].quantity) - parseInt(result.alter_quant);
                 cart[itemIndex].quantity = cartQuant;
 
-                viewCart();
+                setTimeout(() => {
+                    viewCart()
+                }, 1000);
             }
         }
     })
