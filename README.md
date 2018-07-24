@@ -6,7 +6,7 @@
 
  [Drive link to demo video](https://drive.google.com/file/d/1hjvdQvihZsyrmAGu8N_ZAffdfY5BUXz6/view)
 
- ![Demo Gif](./images/demo2.webm)
+ ![Demo Gif](https://drive.google.com/uc?id=1kCzJVwqZyYQ7lbPDQ5yER49DiGDYPX-g)
 
 ## Notable Elements
 
