@@ -33,31 +33,33 @@ function navItems() {
     connection.query(`
     SELECT product_name, price, stock_quantity, item_id
     FROM products`, function (err, res) {
-            if (err) throw err;
-            res.forEach((value, index) => {
-                itemArr.push(`${value.item_id}. ${value.product_name} - price: $${value.price} (${value.stock_quantity} in stock)`);
-            })
+        if (err) throw err;
+        res.forEach((value, index) => {
+            itemArr.push(`${value.item_id}. ${value.product_name} - price: $${value.price} (${value.stock_quantity} in stock)`);
+        })
 
-            inquirer.prompt([{
-                type: 'list',
-                name: 'item_list',
-                message: 'Please choose and item',
-                choices: itemArr
-            }]).then(function (response) {
-                let itemId = response.item_list.split('.', 1).join('');
-                let itemName = res[itemId - 1].product_name;
-                let itemPrice = res[itemId - 1].price;
-                let currentStock = res[itemId - 1].stock_quantity;
+        inquirer.prompt([{
+            type: 'list',
+            name: 'item_list',
+            message: 'Please choose and item',
+            choices: itemArr
+        }]).then(function (response) {
+            let itemId = response.item_list.split('.', 1).join('');
+            let itemName = res[itemId - 1].product_name;
+            let itemPrice = res[itemId - 1].price;
+            let currentStock = res[itemId - 1].stock_quantity;
 
-                if (currentStock <= 0) {
-                    console.log(`\nCurrently out of stock. Please select a different item.\n`)
-                    setTimeout(() => { navItems() }, 2000);
+            if (currentStock <= 0) {
+                console.log(`\nCurrently out of stock. Please select a different item.\n`)
+                setTimeout(() => {
+                    navItems()
+                }, 2000);
 
-                } else {
-                    quantityPrompt(itemId, itemName, currentStock, itemPrice);
-                }
-            })
-        });
+            } else {
+                quantityPrompt(itemId, itemName, currentStock, itemPrice);
+            }
+        })
+    });
 }
 
 navItems();
@@ -86,8 +88,8 @@ function quantityPrompt(itemId, itemName, currentStock, itemPrice) {
 
 function updateStock(itemId, itemName, stock, price, quantity) {
     let newStock = stock - quantity;
-    let itemCost = price * quantity;
-    console.log('\n\nTotal cost is: $', itemCost)
+    let itemCost = price;
+    console.log('\n\nTotal cost is: $', itemCost * quantity)
 
     inquirer.prompt([{
         type: 'confirm',
@@ -121,16 +123,28 @@ function updateStock(itemId, itemName, stock, price, quantity) {
 }
 
 function addToCart(itemId, itemName, quantity, totalPrice) {
-    cart.push({
-        id: itemId,
-        name: itemName,
-        quantity: quantity,
-        totalPrice: totalPrice * quantity
-    })
+
+    
+        let itemIndex = cart.findIndex(function (element) {
+            return element.name === itemName;
+        });
+
+        if (itemIndex === -1) {
+            cart.push({
+                id: itemId,
+                name: itemName,
+                quantity: quantity,
+                totalPrice: totalPrice
+            })
+        } else {
+        cartQuant = parseInt(cart[itemIndex].quantity) + parseInt(quantity);
+        cart[itemIndex].quantity = cartQuant;
+        }    
 }
 
 function viewCart() {
     let cartTotal = 0;
+    let combinedPrice;
 
     let cartTable = new Table({
         head: ['Item', 'Quantity in Cart', 'Total Price'],
@@ -153,11 +167,15 @@ function viewCart() {
         }
     });
 
-    cart.forEach(function (element) {
-        let combinedPrice = element.totalPrice * element.quantity
-        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + combinedPrice])
-        cartTotal += combinedPrice;
-    })
+    cart.forEach(function (element, index) {
+        if (element.quantity === 0) {
+            cart.splice(index,1)
+        
+    } else {
+        cartTotal += element.totalPrice * element.quantity;
+        cartTable.push([element.name, 'in cart: ' + element.quantity, 'total price: $' + (element.totalPrice * element.quantity)])
+    }
+})
     cartTable.push(['', 'CART TOTAL:', '$' + cartTotal])
     console.log(cartTable.toString() + '\n')
 
@@ -232,30 +250,38 @@ function alterQuantity(operation, currentStock, item) {
             `);
 
             //modify cart array
-            itemIndex = cart.findIndex(function(element){
+            itemIndex = cart.findIndex(function (element) {
                 return element.name === item
             });
+            console.log(itemIndex)
             cartQuant = parseInt(cart[itemIndex].quantity) + parseInt(result.alter_quant);
             cart[itemIndex].quantity = cartQuant;
 
             viewCart();
 
         } else {
-            newStock = parseInt(currentStock) + parseInt(result.alter_quant);
-            connection.query(`
-            UPDATE products
-            SET stock_quantity = ${newStock}
-            WHERE product_name = '${item}'
-            `);
-
-             //modify cart array
-             itemIndex = cart.findIndex(function(element){
+            itemIndex = cart.findIndex(function (element) {
                 return element.name === item
             });
-            cartQuant = parseInt(cart[itemIndex].quantity) - parseInt(result.alter_quant);
-            cart[itemIndex].quantity = cartQuant;
+            if (cart[itemIndex].quantity < result.alter_quant) {
+                console.log(`Can't remove more than you have! Try again!`)
+                viewCart();
 
-             viewCart();
+            } else {
+
+                newStock = parseInt(currentStock) + parseInt(result.alter_quant);
+                connection.query(`
+                UPDATE products
+                SET stock_quantity = ${newStock}
+                WHERE product_name = '${item}'
+                `);
+
+                //modify cart array
+                cartQuant = parseInt(cart[itemIndex].quantity) - parseInt(result.alter_quant);
+                cart[itemIndex].quantity = cartQuant;
+
+                viewCart();
+            }
         }
     })
 }
