@@ -1,6 +1,7 @@
 let mysql = require('mysql');
 let inquirer = require('inquirer');
 let Table = require('cli-table');
+let clear = require('clear');
 let fs = require('fs');
 //let tableChars = require('./table.js')
 
@@ -28,6 +29,7 @@ function displayLogo() { // grab ascii text from logo.txt file and print it in c
 }
 
 function navItems() {
+    clear();
     let itemArr = [];
 
     connection.query(`
@@ -152,6 +154,7 @@ function addToCart(itemId, itemName, quantity, totalPrice) {
 }
 
 function viewCart() {
+    clear();
     let cartTotal = 0;
     let combinedPrice;
 

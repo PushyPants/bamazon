@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/PushyPants/bamazon#readme",
   "dependencies": {
+    "clear": "^0.1.0",
     "cli-table": "^0.3.1",
     "inquirer": "^6.0.0",
     "mysql": "^2.16.0"
